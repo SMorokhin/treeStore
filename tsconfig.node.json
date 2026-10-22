@@ -8,13 +8,18 @@
     "eslint.config.*"
   ],
   "compilerOptions": {
+    "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "types": ["node"],
     "noEmit": true,
     "lib": [
-      "ES2021.String"
+      "ES2021.String",
+      "ESNext.Array",
+      "dom",
+      "dom.iterable",
+      "esnext"
     ]
   }
 }
