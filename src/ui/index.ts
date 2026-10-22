@@ -1,0 +1,1 @@
+export { default as UiSpin } from './spin/UiSpin.vue';
