@@ -1,5 +1,4 @@
 type TreeId = string | number;
-
 interface TreeItem {
   id: Readonly<TreeId>;
   parent: TreeId | null;
@@ -7,7 +6,7 @@ interface TreeItem {
   children: TreeItem[];
 }
 
-type RawTreeItem = Omit<TreeItem, "children">;
+export type RawTreeItem = Omit<TreeItem, "children">;
 
 type Tree = Record<TreeId, TreeItem>;
 
@@ -46,24 +45,53 @@ function findItem(id: TreeId, tree: Tree): TreeItem | undefined {
   while (stack.length > 0) {
     const current = stack.pop();
 
-    if (current && String(current.id) === String(id)) {
-      return current;
-    }
+    if (current) {
+      if (String(current.id) === String(id)) {
+        return current;
+      }
 
-    const { children } = current;
+      const { children } = current;
 
-    if (children && Array.isArray(children)) {
-      for (let i = children.length - 1; i >= 0; i--) {
-        const node = children[i];
+      if (children && Array.isArray(children)) {
+        for (let i = children.length - 1; i >= 0; i--) {
+          const node = children[i];
 
-        if (node && String(node.id) === String(id)) {
-          return node;
+          if (node) {
+            if (String(node.id) === String(id)) {
+              return node;
+            }
+
+            stack.push(node);
+          }
         }
-
-        stack.push(node);
       }
     }
   }
+}
+
+function flatTree(tree: Tree): TreeItem[] {
+  const stack = Object.values(structuredClone(tree));
+  const result: TreeItem[] = [];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+
+    if (current) {
+      result.push(current);
+
+      if (current.children) {
+        for (let i = current.children.length - 1; i >= 0; i--) {
+          const item = current.children[i];
+
+          if (item) {
+            stack.push(item);
+          }
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 // TODO: по-хорошему не хранить раздвоенное состояние (tree и rawItems), а оперировать только с деревом. Добавить метод для разоврачивания дерева в плоский список
@@ -76,7 +104,7 @@ export class TreeStore {
   }
 
   getAll(): RawTreeItem[] {
-    return this.rawItems;
+    return flatTree(this.tree);
   }
 
   getItem(id: string): RawTreeItem | undefined {
@@ -104,7 +132,7 @@ export class TreeStore {
   }
 
   getAllChildren(id: string): RawTreeItem[] {
-    const result = [];
+    const result: RawTreeItem[] = [];
     const target = findItem(id, this.tree);
 
     if (target && target.children) {
@@ -113,13 +141,20 @@ export class TreeStore {
 
       while (stack.length > 0) {
         const current = stack.pop();
-        const { children, ...item } = current ?? {};
 
-        result.push(item);
+        if (current) {
+          const { children, ...item } = current;
 
-        if (children) {
-          for (let i = children.length - 1; i >= 0; i--) {
-            stack.push(children[i]);
+          result.push(item);
+
+          if (children) {
+            for (let i = children.length - 1; i >= 0; i--) {
+              const item = children[i];
+
+              if (item) {
+                stack.push(item);
+              }
+            }
           }
         }
       }
@@ -128,13 +163,13 @@ export class TreeStore {
     return result;
   }
 
-  getAllParents(id: string): RawTreeItem[] {
+  getAllParents(id: string): TreeItem[] {
     const target = findItem(id, this.tree);
-    const result: RawTreeItem[] = [];
+    const result: TreeItem[] = [];
 
     if (target) {
-      let { children, ...current } = target;
-      const rawItemsMap = this.rawItems.reduce<Record<TreeId, RawTreeItem>>(
+      const items = flatTree(this.tree);
+      const itemsMap = items.reduce<Record<TreeId, TreeItem>>(
         (acc, el) => {
           acc[el.id] = el;
           return acc;
@@ -142,9 +177,16 @@ export class TreeStore {
         {},
       );
 
-      while (current) {
-        result.push(current);
-        current = rawItemsMap[current.parent];
+      let node: TreeItem | undefined = target;
+
+      while (node) {
+        result.push(node);
+
+        if (node.parent) {
+          node = itemsMap[node.parent];
+        } else {
+          node = undefined;
+        }
       }
     }
 
@@ -179,7 +221,11 @@ export class TreeStore {
 
           if (current.children) {
             for (let i = current.children.length - 1; i >= 0; i--) {
-              stack.push(current.children[i]);
+              const item = current.children[i];
+
+              if (item) {
+                stack.push(item);
+              }
             }
           }
         }
@@ -193,7 +239,6 @@ export class TreeStore {
     const targetId = this.rawItems.findIndex(
       (value) => String(value.id) === String(item.id),
     );
-    console.log("targetId", targetId);
 
     if (targetId !== -1) {
       const newItems = this.rawItems.toSpliced(targetId, 1, item);
